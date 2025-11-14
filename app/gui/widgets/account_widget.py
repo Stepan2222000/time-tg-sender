@@ -198,20 +198,42 @@ class TelegramWorker(QThread):
             asyncio.set_event_loop(loop)
             
             try:
-                # Generate device fingerprint using TLAPI
-                from app.tlapi import API
-                api_data = API.TelegramAndroid.Generate(unique_id=self.phone_number)
+                # CRITICAL FIX: Use DeviceFingerprintManager instead of direct TLAPI calls
+                # Load account from database to get fingerprint
+                from app.services.db import get_session
+                from app.models import Account as AccountModel
+                from app.core.device_fingerprint import DeviceFingerprintManager
+
+                # Get fingerprint from database
+                with get_session() as db_session:
+                    account = db_session.get(AccountModel, self.account_id)
+                    if not account:
+                        self.finished.emit(f"❌ Account not found in database", False)
+                        return
+
+                    # Ensure fingerprint exists and is saved
+                    api_data = DeviceFingerprintManager.ensure_fingerprint(account, save_to_db=False)
+                    db_session.commit()
+
+                    # Extract data before session closes
+                    device_model = api_data.device_model
+                    system_version = api_data.system_version
+                    app_version = api_data.app_version
+                    lang_code = api_data.lang_code
+                    system_lang_code = api_data.system_lang_code
+                    api_id_final = api_data.api_id
+                    api_hash_final = api_data.api_hash
 
                 # Create client with device fingerprint
                 client = TelegramClient(
                     self.session_path or f"app_data/sessions/session_{self.phone_number}",
-                    int(self.api_id),
-                    self.api_hash,
-                    device_model=api_data.device_model,
-                    system_version=api_data.system_version,
-                    app_version=api_data.app_version,
-                    lang_code=api_data.lang_code,
-                    system_lang_code=api_data.system_lang_code
+                    int(api_id_final),
+                    api_hash_final,
+                    device_model=device_model,
+                    system_version=system_version,
+                    app_version=app_version,
+                    lang_code=lang_code,
+                    system_lang_code=system_lang_code
                 )
                 
                 if self._should_stop:
@@ -316,20 +338,42 @@ class TelegramWorker(QThread):
             asyncio.set_event_loop(loop)
             
             try:
-                # Generate device fingerprint using TLAPI
-                from app.tlapi import API
-                api_data = API.TelegramAndroid.Generate(unique_id=self.phone_number)
+                # CRITICAL FIX: Use DeviceFingerprintManager instead of direct TLAPI calls
+                # Load account from database to get fingerprint
+                from app.services.db import get_session
+                from app.models import Account as AccountModel
+                from app.core.device_fingerprint import DeviceFingerprintManager
+
+                # Get fingerprint from database
+                with get_session() as db_session:
+                    account = db_session.get(AccountModel, self.account_id)
+                    if not account:
+                        self.finished.emit(f"❌ Account not found in database", False)
+                        return
+
+                    # Ensure fingerprint exists and is saved
+                    api_data = DeviceFingerprintManager.ensure_fingerprint(account, save_to_db=False)
+                    db_session.commit()
+
+                    # Extract data before session closes
+                    device_model = api_data.device_model
+                    system_version = api_data.system_version
+                    app_version = api_data.app_version
+                    lang_code = api_data.lang_code
+                    system_lang_code = api_data.system_lang_code
+                    api_id_final = api_data.api_id
+                    api_hash_final = api_data.api_hash
 
                 # Create client with device fingerprint
                 client = TelegramClient(
                     self.session_path or f"app_data/sessions/session_{self.phone_number}",
-                    int(self.api_id),
-                    self.api_hash,
-                    device_model=api_data.device_model,
-                    system_version=api_data.system_version,
-                    app_version=api_data.app_version,
-                    lang_code=api_data.lang_code,
-                    system_lang_code=api_data.system_lang_code
+                    int(api_id_final),
+                    api_hash_final,
+                    device_model=device_model,
+                    system_version=system_version,
+                    app_version=app_version,
+                    lang_code=lang_code,
+                    system_lang_code=system_lang_code
                 )
                 
                 if self._should_stop:
@@ -405,20 +449,42 @@ class TelegramWorker(QThread):
             asyncio.set_event_loop(loop)
             
             try:
-                # Generate device fingerprint using TLAPI
-                from app.tlapi import API
-                api_data = API.TelegramAndroid.Generate(unique_id=self.phone_number)
+                # CRITICAL FIX: Use DeviceFingerprintManager instead of direct TLAPI calls
+                # Load account from database to get fingerprint
+                from app.services.db import get_session
+                from app.models import Account as AccountModel
+                from app.core.device_fingerprint import DeviceFingerprintManager
+
+                # Get fingerprint from database
+                with get_session() as db_session:
+                    account = db_session.get(AccountModel, self.account_id)
+                    if not account:
+                        self.finished.emit(f"❌ Account not found in database", False)
+                        return
+
+                    # Ensure fingerprint exists and is saved
+                    api_data = DeviceFingerprintManager.ensure_fingerprint(account, save_to_db=False)
+                    db_session.commit()
+
+                    # Extract data before session closes
+                    device_model = api_data.device_model
+                    system_version = api_data.system_version
+                    app_version = api_data.app_version
+                    lang_code = api_data.lang_code
+                    system_lang_code = api_data.system_lang_code
+                    api_id_final = api_data.api_id
+                    api_hash_final = api_data.api_hash
 
                 # Create client with device fingerprint
                 client = TelegramClient(
                     self.session_path or f"app_data/sessions/session_{self.phone_number}",
-                    int(self.api_id),
-                    self.api_hash,
-                    device_model=api_data.device_model,
-                    system_version=api_data.system_version,
-                    app_version=api_data.app_version,
-                    lang_code=api_data.lang_code,
-                    system_lang_code=api_data.system_lang_code
+                    int(api_id_final),
+                    api_hash_final,
+                    device_model=device_model,
+                    system_version=system_version,
+                    app_version=app_version,
+                    lang_code=lang_code,
+                    system_lang_code=system_lang_code
                 )
                 
                 if self._should_stop:
