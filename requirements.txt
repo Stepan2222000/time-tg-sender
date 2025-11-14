@@ -11,3 +11,6 @@ cryptography>=41.0.0
 python-dotenv>=1.0.0
 aiofiles>=23.0.0
 asyncio-throttle>=1.0.0
+
+# Device fingerprint support (TLAPI integration)
+tgcrypto>=1.2.5

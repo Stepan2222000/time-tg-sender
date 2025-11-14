@@ -91,6 +91,8 @@ class DatabaseService:
                 cursor.execute("PRAGMA journal_mode=WAL")
                 # Set synchronous mode for better performance
                 cursor.execute("PRAGMA synchronous=NORMAL")
+                # Set busy timeout for better lock handling (60 seconds)
+                cursor.execute("PRAGMA busy_timeout=60000")
                 # Set cache size
                 cursor.execute("PRAGMA cache_size=10000")
                 # Set temp store to memory

@@ -20,6 +20,7 @@ from telethon.errors import (
 
 from ..services.logger import get_logger
 from ..models import Account, AccountStatus
+from .device_fingerprint import DeviceFingerprintManager
 
 
 class TelegramClientWrapper:
@@ -33,6 +34,23 @@ class TelegramClientWrapper:
         self.logger = get_logger()
         self._connected = False
         self._authorized = False
+        self._api_data = None  # Will be set in _get_or_generate_api()
+
+    def _get_or_generate_api(self):
+        """Get or generate API configuration with device fingerprint."""
+        if self._api_data is not None:
+            return self._api_data
+
+        # CRITICAL FIX: Changed save_to_db=True to persist fingerprints
+        # Generate/get API data using DeviceFingerprintManager
+        self._api_data = DeviceFingerprintManager.ensure_fingerprint(self.account, save_to_db=True)
+
+        self.logger.info(
+            f"Using device fingerprint for {self.account.phone_number}: "
+            f"{self._api_data.device_model} {self._api_data.system_version}"
+        )
+
+        return self._api_data
     
     async def connect(self) -> bool:
         """Connect to Telegram."""
@@ -40,11 +58,19 @@ class TelegramClientWrapper:
             if self.client and self._connected:
                 return True
             
-            # Create client
+            # Get API configuration with device fingerprint
+            api_data = self._get_or_generate_api()
+
+            # Create client with device fingerprint parameters
             self.client = TelegramClient(
                 self.account.session_path,
-                self.account.api_id,
-                self.account.api_hash,
+                api_data.api_id,
+                api_data.api_hash,
+                device_model=api_data.device_model,
+                system_version=api_data.system_version,
+                app_version=api_data.app_version,
+                lang_code=api_data.lang_code,
+                system_lang_code=api_data.system_lang_code,
                 proxy=self.proxy
             )
             

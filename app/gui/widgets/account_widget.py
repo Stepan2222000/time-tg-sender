@@ -198,11 +198,20 @@ class TelegramWorker(QThread):
             asyncio.set_event_loop(loop)
             
             try:
-                # Create client
+                # Generate device fingerprint using TLAPI
+                from app.tlapi import API
+                api_data = API.TelegramAndroid.Generate(unique_id=self.phone_number)
+
+                # Create client with device fingerprint
                 client = TelegramClient(
                     self.session_path or f"app_data/sessions/session_{self.phone_number}",
                     int(self.api_id),
-                    self.api_hash
+                    self.api_hash,
+                    device_model=api_data.device_model,
+                    system_version=api_data.system_version,
+                    app_version=api_data.app_version,
+                    lang_code=api_data.lang_code,
+                    system_lang_code=api_data.system_lang_code
                 )
                 
                 if self._should_stop:
@@ -307,11 +316,20 @@ class TelegramWorker(QThread):
             asyncio.set_event_loop(loop)
             
             try:
-                # Create client
+                # Generate device fingerprint using TLAPI
+                from app.tlapi import API
+                api_data = API.TelegramAndroid.Generate(unique_id=self.phone_number)
+
+                # Create client with device fingerprint
                 client = TelegramClient(
                     self.session_path or f"app_data/sessions/session_{self.phone_number}",
                     int(self.api_id),
-                    self.api_hash
+                    self.api_hash,
+                    device_model=api_data.device_model,
+                    system_version=api_data.system_version,
+                    app_version=api_data.app_version,
+                    lang_code=api_data.lang_code,
+                    system_lang_code=api_data.system_lang_code
                 )
                 
                 if self._should_stop:
@@ -387,11 +405,20 @@ class TelegramWorker(QThread):
             asyncio.set_event_loop(loop)
             
             try:
-                # Create client
+                # Generate device fingerprint using TLAPI
+                from app.tlapi import API
+                api_data = API.TelegramAndroid.Generate(unique_id=self.phone_number)
+
+                # Create client with device fingerprint
                 client = TelegramClient(
                     self.session_path or f"app_data/sessions/session_{self.phone_number}",
                     int(self.api_id),
-                    self.api_hash
+                    self.api_hash,
+                    device_model=api_data.device_model,
+                    system_version=api_data.system_version,
+                    app_version=api_data.app_version,
+                    lang_code=api_data.lang_code,
+                    system_lang_code=api_data.system_lang_code
                 )
                 
                 if self._should_stop:
@@ -753,10 +780,20 @@ class AccountDialog(QDialog):
             
             # Update notes
             self.account.notes = self.notes_edit.toPlainText().strip() or None
-            
+
             # Save to database
             session = db_get_session()
             try:
+                # CRITICAL FIX: Generate and save device fingerprint
+                # Set device_unique_id to phone number for consistent fingerprint generation
+                if not self.account.device_unique_id:
+                    self.account.device_unique_id = self.account.phone_number
+
+                # Generate device fingerprint if not already present
+                from ...core.device_fingerprint import DeviceFingerprintManager
+                DeviceFingerprintManager.ensure_fingerprint(self.account, save_to_db=False)
+                # Note: save_to_db=False because we'll save via session.commit() below
+
                 if self.account.id is None:
                     session.add(self.account)
                 else:

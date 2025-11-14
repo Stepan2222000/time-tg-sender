@@ -77,7 +77,47 @@ class Account(BaseModel, SoftDeleteMixin, JSONFieldMixin, table=True):
     total_messages_sent: int = Field(default=0)
     total_messages_failed: int = Field(default=0)
     last_send_time: Optional[datetime] = Field(default=None)
-    
+
+    # Device Fingerprint (for avoiding Telegram detection)
+    device_model: Optional[str] = Field(
+        default=None,
+        description="Device model (e.g., 'Samsung SM-G973F', 'iPhone 13 Pro')"
+    )
+    system_version: Optional[str] = Field(
+        default=None,
+        description="OS version (e.g., 'SDK 31', 'iOS 16.2')"
+    )
+    app_version: Optional[str] = Field(
+        default=None,
+        description="Telegram app version (e.g., '10.2.8', '9.5.2')"
+    )
+    lang_code: Optional[str] = Field(
+        default="en",
+        description="Language code (ISO 639-1, e.g., 'en', 'ru')"
+    )
+    system_lang_code: Optional[str] = Field(
+        default="en",
+        description="System language code (e.g., 'en-US', 'ru-RU')"
+    )
+
+    # API Preset configuration
+    api_preset: Optional[str] = Field(
+        default="TelegramAndroid",
+        description="API preset name (TelegramAndroid, TelegramIOS, TelegramDesktop, etc.)"
+    )
+    device_unique_id: Optional[str] = Field(
+        default=None,
+        description="Unique ID for stable fingerprint generation (usually phone_number)"
+    )
+    use_official_api: bool = Field(
+        default=True,
+        description="Use official Telegram API credentials"
+    )
+    fingerprint_last_rotated: Optional[datetime] = Field(
+        default=None,
+        description="Last time device fingerprint was rotated"
+    )
+
     # Relationships
     send_logs: List["SendLog"] = Relationship(back_populates="account")
     

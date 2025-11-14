@@ -281,7 +281,7 @@ class WarmupManager(QObject):
                     status=SendStatus.SENT if success else SendStatus.FAILED,
                     error_message=error,
                     sent_at=datetime.utcnow(),
-                    campaign_id=0,  # Use 0 for warmup (no real campaign)
+                    campaign_id=None,  # No campaign for warmup messages
                     is_warmup=True
                 )
                 

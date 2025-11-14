@@ -689,13 +689,22 @@ class CampaignManager(QObject):
             # Import here to avoid circular imports
             from telethon import TelegramClient
             from telethon.errors import SessionPasswordNeededError
+            from app.core.device_fingerprint import DeviceFingerprintManager
             import os
-            
-            # Create a completely fresh Telegram client
+
+            # Get device fingerprint for account
+            api_data = DeviceFingerprintManager.ensure_fingerprint(account, save_to_db=False)
+
+            # Create a completely fresh Telegram client with device fingerprint
             client = TelegramClient(
                 account.session_path,
-                account.api_id,
-                account.api_hash
+                api_data.api_id,
+                api_data.api_hash,
+                device_model=api_data.device_model,
+                system_version=api_data.system_version,
+                app_version=api_data.app_version,
+                lang_code=api_data.lang_code,
+                system_lang_code=api_data.system_lang_code
             )
             
             # Connect the client
