@@ -262,6 +262,8 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+*.app/
+*.command
 
 # Windows
 Thumbs.db

@@ -50,7 +50,7 @@ class DatabaseService:
                     poolclass=StaticPool,
                     connect_args={
                         "check_same_thread": False,
-                        "timeout": 30,
+                        "timeout": 60,  # Increased from 30 to 60 seconds for better concurrency
                     },
                     echo=self.settings.debug,
                 )

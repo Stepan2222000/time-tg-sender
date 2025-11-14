@@ -117,75 +117,92 @@ class WarmupManager(QObject):
     async def _warmup_account(self, account_id: int):
         """Warmup an account by sending test messages."""
         try:
+            # Get account settings in short-lived session
             with get_session() as session:
                 account = session.get(Account, account_id)
                 if not account:
                     return
-                
-                self.logger.info(f"Starting warmup for account {account.name}")
-                
-                # Get warmup settings
+
+                account_name = account.name
                 target_messages = account.warmup_target_messages
                 interval_minutes = account.warmup_interval_minutes
                 sent_messages = account.warmup_messages_sent
-                
-                # Calculate how many messages to send
-                messages_to_send = target_messages - sent_messages
-                
-                if messages_to_send <= 0:
-                    self.logger.info(f"Warmup complete for account {account.name}")
-                    self.warmup_completed.emit(account_id)
-                    return
-                
-                # Send warmup messages
-                for i in range(messages_to_send):
-                    try:
-                        # Create a test recipient (self)
-                        test_recipient = {
-                            "user_id": account.phone_number,  # Use phone number as test recipient
-                            "username": f"test_{account.name}",
-                            "first_name": "Test",
-                            "last_name": "User"
-                        }
-                        
-                        # Create warmup message
-                        warmup_message = self._create_warmup_message(i + 1, target_messages)
-                        
-                        # Send message
-                        result = await self._send_warmup_message(account, test_recipient, warmup_message)
-                        
-                        if result["success"]:
-                            # Update warmup progress
-                            account.warmup_messages_sent += 1
-                            account.total_messages_sent += 1
-                            account.last_activity = datetime.utcnow()
-                            
-                            session.commit()
-                            
-                            # Emit progress signal
-                            self.warmup_progress.emit(account_id, account.warmup_messages_sent, target_messages)
-                            
-                            self.logger.info(f"Warmup message {account.warmup_messages_sent}/{target_messages} sent for account {account.name}")
-                            
-                            # Check if warmup is complete
-                            if account.is_warmup_complete():
-                                self.logger.info(f"Warmup completed for account {account.name}")
-                                self.warmup_completed.emit(account_id)
-                                break
-                            
-                            # Wait for interval before next message
-                            if i < messages_to_send - 1:  # Don't wait after last message
-                                await asyncio.sleep(interval_minutes * 60)
-                        else:
-                            self.logger.warning(f"Failed to send warmup message for account {account.name}: {result.get('error', 'Unknown error')}")
-                            self.warmup_error.emit(account_id, result.get('error', 'Unknown error'))
+                phone_number = account.phone_number
+                # Session closes here automatically
+
+            self.logger.info(f"Starting warmup for account {account_name}")
+
+            # Calculate how many messages to send
+            messages_to_send = target_messages - sent_messages
+
+            if messages_to_send <= 0:
+                self.logger.info(f"Warmup complete for account {account_name}")
+                self.warmup_completed.emit(account_id)
+                return
+
+            # Send warmup messages
+            for i in range(messages_to_send):
+                try:
+                    # Create a test recipient (self)
+                    test_recipient = {
+                        "user_id": phone_number,
+                        "username": f"test_{account_name}",
+                        "first_name": "Test",
+                        "last_name": "User"
+                    }
+
+                    # Create warmup message
+                    warmup_message = self._create_warmup_message(i + 1, target_messages)
+
+                    # Get fresh account for sending (short-lived session)
+                    with get_session() as send_session:
+                        account = send_session.get(Account, account_id)
+                        if not account:
+                            self.logger.error(f"Account {account_id} disappeared during warmup")
                             break
-                            
-                    except Exception as e:
-                        self.logger.error(f"Error sending warmup message {i+1} for account {account.name}: {e}")
-                        self.warmup_error.emit(account_id, str(e))
+
+                        # Send message (this will create log in separate session)
+                        result = await self._send_warmup_message(account, test_recipient, warmup_message)
+                        # Session closes here
+
+                    if result["success"]:
+                        # Update warmup progress in new short-lived session
+                        with get_session() as update_session:
+                            account = update_session.get(Account, account_id)
+                            if account:
+                                account.warmup_messages_sent += 1
+                                account.total_messages_sent += 1
+                                account.last_activity = datetime.utcnow()
+                                update_session.commit()
+
+                                current_sent = account.warmup_messages_sent
+                                is_complete = account.is_warmup_complete()
+                                # Session closes here
+
+                        # Emit progress signal
+                        self.warmup_progress.emit(account_id, current_sent, target_messages)
+
+                        self.logger.info(f"Warmup message {current_sent}/{target_messages} sent for account {account_name}")
+
+                        # Check if warmup is complete
+                        if is_complete:
+                            self.logger.info(f"Warmup completed for account {account_name}")
+                            self.warmup_completed.emit(account_id)
+                            break
+
+                        # Wait for interval before next message
+                        if i < messages_to_send - 1:  # Don't wait after last message
+                            await asyncio.sleep(interval_minutes * 60)
+                    else:
+                        self.logger.warning(f"Failed to send warmup message for account {account_name}: {result.get('error', 'Unknown error')}")
+                        self.warmup_error.emit(account_id, result.get('error', 'Unknown error'))
                         break
-                
+
+                except Exception as e:
+                    self.logger.error(f"Error sending warmup message {i+1} for account {account_name}: {e}")
+                    self.warmup_error.emit(account_id, str(e))
+                    break
+
         except Exception as e:
             self.logger.error(f"Error in warmup process for account {account_id}: {e}")
             self.warmup_error.emit(account_id, str(e))
