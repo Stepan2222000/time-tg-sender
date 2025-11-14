@@ -378,6 +378,9 @@ GITHUB_TOPICS.md
 PYPI_READY_SUMMARY.md
 LANGUAGE_UPDATE_SUMMARY.md
 
+# GitHub workflows (temporarily excluded due to token permissions)
+.github/workflows/
+
 # Temporary and development files
 content/
 scripts/
