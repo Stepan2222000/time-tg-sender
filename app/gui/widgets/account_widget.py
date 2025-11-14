@@ -850,27 +850,152 @@ class AccountDialog(QDialog):
             # Save to database
             session = db_get_session()
             try:
-                # CRITICAL FIX: Generate and save device fingerprint
-                # Set device_unique_id to phone number for consistent fingerprint generation
-                if not self.account.device_unique_id:
-                    self.account.device_unique_id = self.account.phone_number
-
-                # Generate device fingerprint if not already present
+                from sqlalchemy.exc import IntegrityError
+                from sqlmodel import select
                 from ...core.device_fingerprint import DeviceFingerprintManager
-                DeviceFingerprintManager.ensure_fingerprint(self.account, save_to_db=False)
-                # Note: save_to_db=False because we'll save via session.commit() below
 
-                if self.account.id is None:
-                    session.add(self.account)
+                phone_number = self.account.phone_number
+                account_id_to_save = self.account.id
+
+                # CRITICAL FIX: Check for existing account with same phone number
+                existing_account = session.exec(
+                    select(Account)
+                    .where(Account.phone_number == phone_number)
+                    .where(Account.id != (account_id_to_save or -1))  # Exclude current account if editing
+                ).first()
+
+                if existing_account:
+                    if existing_account.is_deleted:
+                        # Soft-deleted account exists - ask user if they want to restore it
+                        reply = QMessageBox.question(
+                            self,
+                            "Account Was Previously Deleted",
+                            f"An account with phone number {phone_number} was previously deleted.\n\n"
+                            f"Previous account name: {existing_account.name}\n"
+                            f"Deleted at: {existing_account.deleted_at.strftime('%Y-%m-%d %H:%M:%S') if existing_account.deleted_at else 'Unknown'}\n\n"
+                            f"Do you want to restore and update it with the new information?",
+                            QMessageBox.Yes | QMessageBox.No,
+                            QMessageBox.No
+                        )
+
+                        if reply == QMessageBox.Yes:
+                            # Restore the soft-deleted account and update with new data
+                            existing_account.restore()
+                            existing_account.name = self.account.name
+                            existing_account.api_id = self.account.api_id
+                            existing_account.api_hash = self.account.api_hash
+                            existing_account.proxy_type = self.account.proxy_type
+                            existing_account.proxy_host = self.account.proxy_host
+                            existing_account.proxy_port = self.account.proxy_port
+                            existing_account.proxy_username = self.account.proxy_username
+                            existing_account.proxy_password = self.account.proxy_password
+                            existing_account.rate_limit_per_minute = self.account.rate_limit_per_minute
+                            existing_account.rate_limit_per_hour = self.account.rate_limit_per_hour
+                            existing_account.rate_limit_per_day = self.account.rate_limit_per_day
+                            existing_account.warmup_enabled = self.account.warmup_enabled
+                            existing_account.warmup_target_messages = self.account.warmup_target_messages
+                            existing_account.warmup_interval_minutes = self.account.warmup_interval_minutes
+                            existing_account.notes = self.account.notes
+
+                            # Generate device fingerprint for restored account
+                            if not existing_account.device_unique_id:
+                                existing_account.device_unique_id = existing_account.phone_number
+                            DeviceFingerprintManager.ensure_fingerprint(existing_account, save_to_db=False)
+
+                            session.add(existing_account)
+                            session.commit()
+
+                            self.account = existing_account
+                            account_id = self.account.id
+                            account_name = self.account.name
+
+                            self.logger.info(f"Account restored and updated: {account_name}")
+                        else:
+                            # User chose not to restore - cancel save
+                            session.close()
+                            return
+                    else:
+                        # Active account with same phone number exists
+                        QMessageBox.warning(
+                            self,
+                            "Duplicate Phone Number",
+                            f"An account with phone number {phone_number} already exists.\n\n"
+                            f"Account name: {existing_account.name}\n"
+                            f"Status: {existing_account.status.value}"
+                        )
+                        session.close()
+                        return
                 else:
-                    session.merge(self.account)
-                session.commit()
-                
-                # Get the saved account ID before closing session
-                account_id = self.account.id
-                account_name = self.account.name
-            finally:
+                    # No existing account - proceed with save
+                    # Generate device fingerprint
+                    if not self.account.device_unique_id:
+                        self.account.device_unique_id = self.account.phone_number
+                    DeviceFingerprintManager.ensure_fingerprint(self.account, save_to_db=False)
+
+                    if self.account.id is None:
+                        # New account
+                        session.add(self.account)
+                        session.commit()
+
+                        account_id = self.account.id
+                        account_name = self.account.name
+                    else:
+                        # Editing existing account - reload from current session to avoid detached object issues
+                        db_account = session.get(Account, self.account.id)
+                        if db_account:
+                            # Update all fields from self.account to db_account
+                            db_account.name = self.account.name
+                            db_account.phone_number = self.account.phone_number
+                            db_account.api_id = self.account.api_id
+                            db_account.api_hash = self.account.api_hash
+                            db_account.session_path = self.account.session_path
+                            db_account.proxy_type = self.account.proxy_type
+                            db_account.proxy_host = self.account.proxy_host
+                            db_account.proxy_port = self.account.proxy_port
+                            db_account.proxy_username = self.account.proxy_username
+                            db_account.proxy_password = self.account.proxy_password
+                            db_account.rate_limit_per_minute = self.account.rate_limit_per_minute
+                            db_account.rate_limit_per_hour = self.account.rate_limit_per_hour
+                            db_account.rate_limit_per_day = self.account.rate_limit_per_day
+                            db_account.warmup_enabled = self.account.warmup_enabled
+                            db_account.warmup_target_messages = self.account.warmup_target_messages
+                            db_account.warmup_interval_minutes = self.account.warmup_interval_minutes
+                            db_account.notes = self.account.notes
+
+                            # Update device fingerprint fields
+                            db_account.device_unique_id = self.account.device_unique_id
+                            db_account.device_model = self.account.device_model
+                            db_account.system_version = self.account.system_version
+                            db_account.app_version = self.account.app_version
+                            db_account.lang_code = self.account.lang_code
+                            db_account.system_lang_code = self.account.system_lang_code
+                            db_account.api_preset = self.account.api_preset
+                            db_account.use_official_api = self.account.use_official_api
+
+                            session.add(db_account)
+                            session.commit()
+
+                            self.account = db_account
+                            account_id = self.account.id
+                            account_name = self.account.name
+                        else:
+                            raise ValueError(f"Account with ID {self.account.id} not found in database")
+
+            except IntegrityError as e:
+                session.rollback()
+                self.logger.error(f"Database integrity error: {e}")
+                QMessageBox.critical(
+                    self,
+                    "Database Error",
+                    f"Failed to save account due to database constraint.\n\n"
+                    f"This usually means the phone number already exists.\n\n"
+                    f"Error: {str(e)}"
+                )
                 session.close()
+                return
+            finally:
+                if session:
+                    session.close()
             
             self.logger.info(f"Account saved: {account_name}")
             self.account_saved.emit(account_id)
